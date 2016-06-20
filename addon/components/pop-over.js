@@ -146,6 +146,10 @@ export default Ember.Component.extend({
 
     next(this, function () {
       get(this, 'targets').invoke('attach');
+      let didinsert = get(this, 'ondidinsert');
+      if (didinsert) {
+        didinsert(this);
+      }
     });
   }),
 
