@@ -22,7 +22,6 @@ const filterBy = Ember.computed.filterBy;
 const addObserver = Ember.addObserver;
 const removeObserver = Ember.removeObserver;
 
-const isSimpleClick = Ember.ViewUtils.isSimpleClick;
 const $ = Ember.$;
 const integrates = function (key) {
   return computed({
@@ -64,6 +63,8 @@ export default Ember.Component.extend({
 
   flow: 'around',
 
+  windowEventsInitialized: false,
+
   /**
     The target element of the pop over.
     Can be a view, id, or element.
@@ -71,6 +72,12 @@ export default Ember.Component.extend({
   for: null,
 
   on: null,
+
+  /**
+   * Attaching events to document instead of attaching them directly to elements
+   * It's better to leave it set to false for better performance
+   */
+  attachToDocument: false,
 
   addTarget(target, options) {
     get(this, 'targets').pushObject(Target.create(options, {
@@ -109,22 +116,30 @@ export default Ember.Component.extend({
   // Event management
   //
 
-  attachWindowEvents: on('didInsertElement', function () {
+  attachObservers: on('didInsertElement', function () {
     this.retile();
 
-    var retile = this.__retile = bind(this, 'retile');
-    ['scroll', 'resize'].forEach(function (event) {
-      $(window).on(event, retile);
-    });
+    this.__retile = bind(this, 'retile');
 
     addObserver(this, 'active', this, 'retile');
   }),
+
+  attachWindowEvents() {
+    if (!this.windowEventsInitialized) {
+      var retile = this.__retile;
+      ['scroll', 'resize'].forEach(function (event) {
+        $(window).on(event, retile);
+      });
+      this.windowEventsInitialized = true;
+    }
+  },
 
   attachTargets: on('didInsertElement', function () {
     // Add implicit target
     if (get(this, 'for') && get(this, 'on')) {
       this.addTarget(get(this, 'for'), {
-        on: get(this, 'on')
+        on: get(this, 'on'),
+        attachToDocument: get(this, 'attachToDocument')
       });
     }
 
@@ -142,13 +157,21 @@ export default Ember.Component.extend({
     });
 
     if (this.__documentClick) {
-      $(document).off('mousedown', this.__documentClick);
+      $(document).off('mousedown touchstart', this.__documentClick);
       this.__documentClick = null;
     }
 
     removeObserver(this, 'active', this, 'retile');
     this.__retile = null;
   }),
+
+  removeWindowEvents: function() {
+    var retile = this.__retile;
+    ['scroll', 'resize'].forEach(function (event) {
+      $(window).off(event, retile);
+    });
+    this.windowEventsInitialized = false;
+  },
 
   mouseEnter() {
     if (get(this, 'disabled')) { return; }
@@ -177,14 +200,19 @@ export default Ember.Component.extend({
     set(this, 'pressed', false);
     var targets = get(this, 'targets');
     var element = get(this, 'element');
-    var clicked = isSimpleClick(evt) &&
-      (evt.target === element || $.contains(element, evt.target));
+    var clicked = (evt.target === element || $.contains(element, evt.target));
     var clickedAnyTarget = targets.any(function (target) {
       return target.isClicked(evt);
     });
 
     if (!clicked && !clickedAnyTarget) {
       targets.setEach('pressed', false);
+    }
+
+    if (clickedAnyTarget && evt.type === 'touchstart') {
+      // don't allow touch devices to trigger mouseDown
+      evt.stopPropagation();
+      evt.preventDefault();
     }
   },
 
@@ -228,12 +256,12 @@ export default Ember.Component.extend({
       var hidden = !visible;
 
       if (active && hidden) {
-        $(document).on('mousedown', proxy);
+        $(document).on('mousedown touchstart', proxy);
         this.show();
 
       // Remove click events immediately
       } else if (inactive && visible) {
-        $(document).off('mousedown', proxy);
+        $(document).off('mousedown touchstart', proxy);
         this.hide();
       }
     });
@@ -242,11 +270,13 @@ export default Ember.Component.extend({
   hide() {
     if (this.isDestroyed) { return; }
     set(this, 'active', false);
+    this.removeWindowEvents();
   },
 
   show() {
     if (this.isDestroyed) { return; }
     set(this, 'active', true);
+    this.attachWindowEvents();
   },
 
   retile() {

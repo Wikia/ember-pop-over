@@ -107,7 +107,8 @@ var Target = Ember.Object.extend(Ember.Evented, {
       focusout:   bind(this, 'blur'),
       mouseenter: bind(this, 'mouseEnter'),
       mouseleave: bind(this, 'mouseLeave'),
-      mousedown:  bind(this, 'mouseDown')
+      mousedown:  bind(this, 'mouseDown'),
+      touchstart:  bind(this, 'mouseDown')
     };
 
     if (get(target, 'element')) {
@@ -137,17 +138,32 @@ var Target = Ember.Object.extend(Ember.Evented, {
     }
 
     var eventManager = this.eventManager;
+    var events = keys(eventManager);
+    var labelSelector = getLabelSelector($element);
 
-    keys(eventManager).forEach(function (event) {
-      $document.on(event, `#${id}`, eventManager[event]);
-    });
-
-    var selector = getLabelSelector($element);
-    if (selector) {
-      keys(eventManager).forEach(function (event) {
-        $document.on(event, selector, eventManager[event]);
+    if(this.attachToDocument) {
+      events.forEach(function (event) {
+        $document.on(event, `#${id}`, eventManager[event]);
       });
+
+      if (labelSelector) {
+        events.forEach(function (event) {
+          $document.on(event, labelSelector, eventManager[event]);
+        });
+      }
+    } else {
+      events.forEach(function (event) {
+        $element.on(event, eventManager[event]);
+      });
+
+      if (labelSelector) {
+        events.forEach(function (event) {
+          $(labelSelector).on(event, eventManager[event]);
+        });
+      }
     }
+
+
   },
 
   detach: function () {
@@ -156,17 +172,31 @@ var Target = Ember.Object.extend(Ember.Evented, {
     var $document = $(document);
 
     var eventManager = this.eventManager;
+    var events = keys(eventManager);
+    var labelSelector = getLabelSelector($element);
 
     var id = $element.attr('id');
-    keys(eventManager).forEach(function (event) {
-      $document.off(event, '#' + id, eventManager[event]);
-    });
 
-    var selector = getLabelSelector($element);
-    if (selector) {
-      keys(eventManager).forEach(function (event) {
-        $document.off(event, selector, eventManager[event]);
+    if(this.attachToDocument) {
+      events.forEach(function (event) {
+        $document.off(event, `#${id}`, eventManager[event]);
       });
+
+      if (labelSelector) {
+        events.forEach(function (event) {
+          $document.off(event, labelSelector, eventManager[event]);
+        });
+      }
+    } else {
+      events.forEach(function (event) {
+        $element.off(event, eventManager[event]);
+      });
+
+      if (labelSelector) {
+        events.forEach(function (event) {
+          $(labelSelector).off(event, eventManager[event]);
+        });
+      }
     }
 
     // Remove references for GC
@@ -267,19 +297,24 @@ var Target = Ember.Object.extend(Ember.Evented, {
 
       var eventManager = this.eventManager;
       eventManager.mouseup = bind(this, 'mouseUp');
-      $(document).on('mouseup', eventManager.mouseup);
+      $(document).on('mouseup touchend', eventManager.mouseup);
 
       evt.preventDefault();
     }
 
     $(element).focus();
+    if (evt.type === 'touchstart') {
+      // don't allow touch devices to trigger mouseDown
+      evt.stopPropagation();
+      evt.preventDefault();
+    }
     return true;
   }),
 
   mouseUp: function (evt) {
     // Remove mouseup event
     var eventManager = this.eventManager;
-    $(document).off('mouseup', eventManager.mouseup);
+    $(document).off('mouseup touchend', eventManager.mouseup);
     eventManager.mouseup = null;
 
     var label = labelForEvent(evt);

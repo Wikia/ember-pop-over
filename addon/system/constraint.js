@@ -65,7 +65,7 @@ function slideHorizontally(guidelines, boundary, target, popover, pointer) {
     'right-edge': target.width - popover.width
   };
   var range = Ember.A(guidelines).map(function (guideline) {
-    return edges[guideline] || [-1, -1];
+    return edges.hasOwnProperty(guideline) ? edges[guideline]: -1;
   });
 
   var left = target.x + range[0];
@@ -80,10 +80,10 @@ function slideHorizontally(guidelines, boundary, target, popover, pointer) {
   var padding = pointer.width;
 
   // Adjust the popover so it remains in view
-  if (left < boundary.left + padding) {
-    left = boundary.left + padding;
-  } else if (right > boundary.right - padding) {
-    left = boundary.right - popover.width - padding;
+  if (left < boundary.left ) {
+    left = boundary.left;
+  } else if (right > boundary.right) {
+    left = Math.max(boundary.right - popover.width, boundary.left);
   }
 
   var valid = left >= minX && left <= maxX;
