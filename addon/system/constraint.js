@@ -87,10 +87,8 @@ function slideHorizontally(guidelines, boundary, target, popover, pointer) {
   let minX = target.x + range[0];
   let maxX = target.x + range[1];
 
-  let padding = pointer.width;
-
   // Adjust the popover so it remains in view
-  if (left < boundary.left ) {
+  if (left < boundary.left) {
     left = boundary.left;
   } else if (right > boundary.right) {
     left = Math.max(boundary.right - popover.width, boundary.left);

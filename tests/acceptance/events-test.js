@@ -59,23 +59,23 @@ test('on="click"', function (assert) {
 
   simpleClick("#click");
   andThen(function () {
-    ok(find(".pop-over-container:visible").length === 0);
+    assert.ok(find(".pop-over-container:visible").length === 0);
   });
 
   touchStart("#click");
   andThen(function () {
-    ok(find(".pop-over-container:visible").length === 1);
+    assert.ok(find(".pop-over-container:visible").length === 1);
   });
 
   andThen(function () {
-    var defer = Ember.RSVP.defer();
+    let defer = Ember.RSVP.defer();
     later(defer, 'resolve', 400);
     return defer.promise;
   });
 
   touchEnd("#click");
   andThen(function () {
-    ok(find(".pop-over-container:visible").length === 1);
+    assert.ok(find(".pop-over-container:visible").length === 1);
   });
 
 
@@ -99,18 +99,18 @@ test('on="click hold"', function (assert) {
 
   touchStart("#click-hold");
   andThen(function () {
-    ok(find(".pop-over-container:visible").length === 1);
+    assert.ok(find(".pop-over-container:visible").length === 1);
   });
 
   andThen(function () {
-    var defer = Ember.RSVP.defer();
+    let defer = Ember.RSVP.defer();
     later(defer, 'resolve', 400);
     return defer.promise;
   });
 
   touchStop("#click-hold");
   andThen(function () {
-    ok(find(".pop-over-container:visible").length === 0);
+    assert.ok(find(".pop-over-container:visible").length === 0);
   });
 
   simpleClick("#click-hold");

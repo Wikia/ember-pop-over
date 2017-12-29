@@ -50,6 +50,14 @@ export default Component.extend({
 
   flow: 'around',
 
+  windowEventsInitialized: false,
+
+  /**
+   * Attaching events to document instead of attaching them directly to elements
+   * It's better to leave it set to false for better performance
+   */
+  attachToDocument: false,
+
   gravity: null,
 
   cover: false,
@@ -80,22 +88,30 @@ export default Component.extend({
   // Event management
   //
 
-  attachWindowEvents: on('didInsertElement', function () {
+  attachObservers: on('didInsertElement', function () {
     this.retile();
 
-    var retile = this.__retile = bind(this, 'retile');
-    ['scroll', 'resize'].forEach(function (event) {
-      window.addEventListener(event, retile, true);
-    });
+    this.__retile = bind(this, 'retile');
 
     addObserver(this, 'active', this, 'retile');
   }),
+
+  attachWindowEvents() {
+    if (!this.windowEventsInitialized) {
+      let retile = this.__retile;
+      ['scroll', 'resize'].forEach(function (event) {
+        window.addEventListener(event, retile);
+      });
+      this.windowEventsInitialized = true;
+    }
+  },
 
   attachTargets: on('didInsertElement', function () {
     // Add implicit target
     if (get(this, 'for') && get(this, 'on')) {
       this.addTarget(get(this, 'for'), {
-        on: get(this, 'on')
+        on: get(this, 'on'),
+        attachToDocument: get(this, 'attachToDocument')
       });
     }
 
@@ -119,12 +135,21 @@ export default Component.extend({
 
     if (this.__documentClick) {
       document.removeEventListener('mousedown', this.__documentClick);
+      document.removeEventListener('touchstart', this.__documentClick);
       this.__documentClick = null;
     }
 
     removeObserver(this, 'active', this, 'retile');
     this.__retile = null;
   }),
+
+  removeWindowEvents() {
+    let retile = this.__retile;
+    ['scroll', 'resize'].forEach(function (event) {
+      window.removeEventListener(event, retile);
+    });
+    this.windowEventsInitialized = false;
+  },
 
   mouseEnter() {
     if (get(this, 'disabled')) { return; }
@@ -166,13 +191,19 @@ export default Component.extend({
     set(this, 'pressed', false);
     var targets = get(this, 'targets');
     var element = get(this, 'element');
-    var clicked = evt.target === element || $.contains(element, evt.target);
+    var clicked = (evt.target === element || $.contains(element, evt.target));
     var clickedAnyTarget = targets.any(function (target) {
       return target.isClicked(evt);
     });
 
     if (!clicked && !clickedAnyTarget) {
       targets.setEach('pressed', false);
+    }
+
+    if (clickedAnyTarget && evt.type === 'touchstart') {
+      // don't allow touch devices to trigger mouseDown
+      evt.stopPropagation();
+      evt.preventDefault();
     }
   },
 
@@ -213,11 +244,13 @@ export default Component.extend({
 
       if (active && hidden) {
         document.addEventListener('mousedown', proxy);
+        document.addEventListener('touchstart', proxy);
         this.show();
 
       // Remove click events immediately
       } else if (inactive && visible) {
         document.removeEventListener('mousedown', proxy);
+        document.removeEventListener('touchstart', proxy);
         this.hide();
       }
     });
@@ -230,6 +263,7 @@ export default Component.extend({
     if (get(this, 'onhide')) {
       get(this, 'onhide')();
     }
+    this.removeWindowEvents();
   },
 
   show() {
@@ -238,6 +272,7 @@ export default Component.extend({
     if (get(this, 'onshow')) {
       get(this, 'onshow')();
     }
+    this.attachWindowEvents();
   },
 
   retile() {
