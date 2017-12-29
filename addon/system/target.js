@@ -1,21 +1,25 @@
 import Ember from "ember";
-
-const keys = Object.keys;
-const copy = Ember.copy;
-const get = Ember.get;
-const set = Ember.set;
-
-const computed = Ember.computed;
-
-const generateGuid = Ember.generateGuid;
-
-const w = Ember.String.w;
-
-const bind = Ember.run.bind;
-const next = Ember.run.next;
-
 const isSimpleClick = Ember.ViewUtils.isSimpleClick;
-const $ = Ember.$;
+
+import get from 'ember-metal/get';
+import set from 'ember-metal/set';
+import { copy, generateGuid } from 'ember-metal/utils';
+import computed from 'ember-computed';
+import { w } from 'ember-string';
+import { bind, next, later } from 'ember-runloop';
+import $ from 'jquery';
+import { assert } from 'ember-metal/utils';
+import { A } from 'ember-array/utils';
+import Evented from 'ember-evented';
+import EmberObject from 'ember-object';
+
+function includes(haystack, needle) {
+  if (haystack.includes) {
+    return haystack.includes(needle);
+  } else {
+    return haystack.contains(needle);
+  }
+}
 
 function guard (fn) {
   return function (evt) {
@@ -35,22 +39,14 @@ function getElementForTarget(target) {
 }
 
 function getLabelSelector($element) {
-  var id = $element.attr('id');
+  let id = $element.attr('id');
   if (id) {
     return `label[for="${id}"]`;
   }
 }
 
-function getNearestComponentForElement(registry, element) {
-  var $target = $(element);
-  if (!$target.hasClass('ember-view')) {
-    $target = $target.parents('ember-view');
-  }
-  return registry[$target.attr('id')];
-}
-
 function labelForEvent(evt) {
-  var $target = $(evt.target);
+  let $target = $(evt.target);
   if ($target[0].tagName.toLowerCase() === 'label') {
     return $target;
   } else {
@@ -68,19 +64,19 @@ function isLabelClicked(target, label) {
 const VALID_ACTIVATORS = ["focus", "hover", "click", "hold"];
 function parseActivators(value) {
   if (value) {
-    var activators = value;
+    let activators = value;
     if (typeof value === "string") {
-      activators = Ember.A(w(value));
+      activators = A(w(value));
     }
-    Ember.assert(
+    assert(
       `${value} are not valid activators.
         Valid events are ${VALID_ACTIVATORS.join(', ')}`,
-      Ember.A(copy(activators)).removeObjects(VALID_ACTIVATORS).length === 0
+      A(copy(activators)).removeObjects(VALID_ACTIVATORS).length === 0
     );
     return activators;
   }
 
-  Ember.assert(
+  assert(
     `You must provide an event name to the {{pop-over}}.
       Valid events are ${VALID_ACTIVATORS.join(', ')}`,
     false
@@ -96,19 +92,18 @@ function poll(target, scope, fn) {
 }
 
 
-var Target = Ember.Object.extend(Ember.Evented, {
+export default EmberObject.extend(Evented, {
 
   init: function () {
-    var target = get(this, 'target');
-    Ember.assert("You cannot make the {{pop-over}} a target of itself.", get(this, 'component') !== target);
+    let target = get(this, 'target');
+    assert("You cannot make the {{pop-over}} a target of itself.", get(this, 'component') !== target);
 
     this.eventManager = {
       focusin:    bind(this, 'focus'),
       focusout:   bind(this, 'blur'),
-      mouseenter: bind(this, 'mouseEnter'),
       mouseleave: bind(this, 'mouseLeave'),
       mousedown:  bind(this, 'mouseDown'),
-      touchstart:  bind(this, 'mouseDown')
+      touchstart: bind(this, 'mouseDown')
     };
 
     if (get(target, 'element')) {
@@ -121,9 +116,9 @@ var Target = Ember.Object.extend(Ember.Evented, {
   },
 
   attach: function () {
-    var element = getElementForTarget(this.target);
-    var $element = $(element);
-    var $document = $(document);
+    let element = getElementForTarget(this.target);
+    let $element = $(element);
+    let $document = $(document);
 
     // Already attached or awaiting an element to exist
     if (get(this, 'attached') || element == null) { return; }
@@ -131,17 +126,24 @@ var Target = Ember.Object.extend(Ember.Evented, {
     set(this, 'attached', true);
     set(this, 'element', element);
 
-    var id = $element.attr('id');
+    let id = $element.attr('id');
     if (id == null) {
       id = generateGuid();
       $element.attr('id', id);
     }
 
-    var eventManager = this.eventManager;
-    var events = keys(eventManager);
-    var labelSelector = getLabelSelector($element);
+    let onhover = get(this, 'onhover');
+    if (onhover) {
+      onhover.addEventListener(element, (evt) => {
+        this.mouseEnter(evt);
+      });
+    }
 
-    if(this.attachToDocument) {
+    let eventManager = this.eventManager;
+    let events = Object.keys(eventManager);
+    let labelSelector = getLabelSelector($element);
+
+    if (this.attachToDocument) {
       events.forEach(function (event) {
         $document.on(event, `#${id}`, eventManager[event]);
       });
@@ -162,22 +164,19 @@ var Target = Ember.Object.extend(Ember.Evented, {
         });
       }
     }
-
-
   },
 
   detach: function () {
-    var element = this.element;
-    var $element = $(element);
-    var $document = $(document);
+    let element = this.element;
+    let $element = $(element);
+    let $document = $(document);
 
-    var eventManager = this.eventManager;
-    var events = keys(eventManager);
-    var labelSelector = getLabelSelector($element);
+    let eventManager = this.eventManager;
+    let events = Object.keys(eventManager);
+    let labelSelector = getLabelSelector($element);
 
-    var id = $element.attr('id');
-
-    if(this.attachToDocument) {
+    let id = $element.attr('id');
+    if (this.attachToDocument) {
       events.forEach(function (event) {
         $document.off(event, `#${id}`, eventManager[event]);
       });
@@ -199,6 +198,11 @@ var Target = Ember.Object.extend(Ember.Evented, {
       }
     }
 
+    let onhover = get(this, 'onhover');
+    if (onhover) {
+      onhover.removeEventListener(element);
+    }
+
     // Remove references for GC
     this.eventManager = null;
     set(this, 'element', null);
@@ -214,8 +218,8 @@ var Target = Ember.Object.extend(Ember.Evented, {
 
   isClicked: function (evt) {
     if (isSimpleClick(evt)) {
-      var label = labelForEvent(evt);
-      var element = this.element;
+      let label = labelForEvent(evt);
+      let element = this.element;
       return evt.target === element || $.contains(element, evt.target) ||
         isLabelClicked(element, label);
     }
@@ -224,13 +228,13 @@ var Target = Ember.Object.extend(Ember.Evented, {
 
   active: computed('focused', 'hovered', 'pressed', 'component.hovered', 'component.pressed', {
     set(key, value) {
-      var activators = get(this, 'on');
+      let activators = get(this, 'on');
       if (value) {
-        if (activators.contains('focus')) {
+        if (includes(activators, 'focus')) {
           set(this, 'focused', true);
-        } else if (activators.contains('hover')) {
+        } else if (includes(activators, 'hover')) {
           set(this, 'hovered', true);
-        } else if (activators.contains('click')) {
+        } else if (includes(activators, 'click')) {
           set(this, 'pressed', true);
         }
       } else {
@@ -242,24 +246,24 @@ var Target = Ember.Object.extend(Ember.Evented, {
     },
 
     get() {
-      var activators = get(this, 'on');
-      var active = false;
+      let activators = get(this, 'on');
+      let active = false;
 
-      if (activators.contains('focus')) {
+      if (includes(activators, 'focus')) {
         active = active || get(this, 'focused');
-        if (activators.contains('hold')) {
+        if (includes(activators, 'hold')) {
           active = active || get(this, 'component.pressed');
         }
       }
 
-      if (activators.contains('hover')) {
+      if (includes(activators, 'hover')) {
         active = active || get(this, 'hovered');
-        if (activators.contains('hold')) {
+        if (includes(activators, 'hold')) {
           active = active || get(this, 'component.hovered');
         }
       }
 
-      if (activators.contains('click') || activators.contains('hold')) {
+      if (includes(activators, 'click') || includes(activators, 'hold')) {
         active = active || get(this, 'pressed');
       }
 
@@ -275,12 +279,21 @@ var Target = Ember.Object.extend(Ember.Evented, {
     set(this, 'focused', false);
   }),
 
-  mouseEnter: guard(function () {
+  mouseEnter: guard(function() {
+    this._willLeave = false;
     set(this, 'hovered', true);
+    this._willLeave = false;
   }),
 
   mouseLeave: guard(function () {
-    set(this, 'hovered', false);
+    this._willLeave = true;
+    later(() => {
+      if (get(this, 'component.disabled')) { return; }
+      if (this._willLeave) {
+        this._willLeave = false;
+        set(this, 'hovered', false);
+      }
+    }, 150);
   }),
 
   mouseDown: guard(function (evt) {
@@ -288,14 +301,14 @@ var Target = Ember.Object.extend(Ember.Evented, {
       return false;
     }
 
-    var element = this.element;
-    var active = !get(this, 'active');
+    let element = this.element;
+    let active = !get(this, 'active');
     set(this, 'pressed', active);
 
     if (active) {
       this.holdStart = new Date().getTime();
 
-      var eventManager = this.eventManager;
+      let eventManager = this.eventManager;
       eventManager.mouseup = bind(this, 'mouseUp');
       $(document).on('mouseup touchend', eventManager.mouseup);
 
@@ -303,21 +316,23 @@ var Target = Ember.Object.extend(Ember.Evented, {
     }
 
     $(element).focus();
+
     if (evt.type === 'touchstart') {
       // don't allow touch devices to trigger mouseDown
       evt.stopPropagation();
       evt.preventDefault();
     }
+
     return true;
   }),
 
   mouseUp: function (evt) {
     // Remove mouseup event
-    var eventManager = this.eventManager;
+    let eventManager = this.eventManager;
     $(document).off('mouseup touchend', eventManager.mouseup);
     eventManager.mouseup = null;
 
-    var label = labelForEvent(evt);
+    let label = labelForEvent(evt);
 
     // Treat clicks on <label> elements as triggers to
     // open the menu
@@ -325,14 +340,9 @@ var Target = Ember.Object.extend(Ember.Evented, {
       return true;
     }
 
-    var view = getNearestComponentForElement(this._viewRegistry, evt.target);
-    var activators = get(this, 'on');
+    let activators = get(this, 'on');
 
-    // Manually trigger a click on internal elements
-    if (view && view.nearestOfType(get(this, 'component').constructor)) {
-      view.trigger('click');
-
-    } else if (activators.contains('click') && activators.contains('hold')) {
+    if (includes(activators, 'click') && includes(activators, 'hold')) {
       // If the user waits more than 400ms between mouseDown and mouseUp,
       // we can assume that they are clicking and dragging to the menu item,
       // and we should close the menu if they mouseup anywhere not inside
@@ -346,4 +356,3 @@ var Target = Ember.Object.extend(Ember.Evented, {
 
 });
 
-export default Target;
