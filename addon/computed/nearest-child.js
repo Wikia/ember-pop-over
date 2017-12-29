@@ -3,6 +3,7 @@ import Ember from "ember";
 const computed = Ember.computed;
 const bind = Ember.run.bind;
 const get = Ember.get;
+const getOwner = Ember.getOwner;
 
 function flatten(array) {
   return Ember.A(array).reduce(function (a, b) {
@@ -37,8 +38,8 @@ export default function(type) {
 
   return computed('childViews.[]', {
     get(key) {
-      var typeClass = this.container.lookupFactory('component:' + type) ||
-                      this.container.lookupFactory('view:' + type);
+      var typeClass = getOwner(this).factoryFor('component:' + type) ||
+                      getOwner(this).factoryFor('view:' + type);
 
       var children = Ember.A(get(this, 'childViews'));
       var appendedChildren = children.filterBy('_state', 'inDOM');
