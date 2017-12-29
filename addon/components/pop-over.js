@@ -14,6 +14,7 @@ const once = Ember.run.once;
 
 const get = Ember.get;
 const set = Ember.set;
+const getOwner = Ember.getOwner;
 
 const alias = Ember.computed.alias;
 const bool = Ember.computed.bool;
@@ -26,7 +27,7 @@ const $ = Ember.$;
 const integrates = function (key) {
   return computed({
     get() {
-      return this.container.lookup(`pop-over-integrations:${key}`);
+      return getOwner(this).lookup(`pop-over-integrations:${key}`);
     }
   });
 };
@@ -83,7 +84,7 @@ export default Ember.Component.extend({
     get(this, 'targets').pushObject(Target.create(options, {
       component: this,
       target: target,
-      _viewRegistry: this.container.lookup('-view-registry:main')
+      _viewRegistry: getOwner(this).lookup('-view-registry:main')
     }));
   },
 
@@ -307,7 +308,7 @@ export default Ember.Component.extend({
 
     if (boundingRect.intersects(targetRect)) {
       var flowName = get(this, 'flow');
-      var constraints = this.container.lookup('pop-over-constraint:' + flowName);
+      var constraints = getOwner(this).lookup('pop-over-constraint:' + flowName);
       Ember.assert(
         `The flow named '${flowName}' was not registered with the {{pop-over}}.
          Register your flow by adding an additional export to 'app/flows.js':
