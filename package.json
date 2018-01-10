@@ -42,7 +42,9 @@
     "pop-over"
   ],
   "dependencies": {
-    "ember-cli-babel": "^5.1.3"
+    "dom-ruler": "^0.2.4",
+    "ember-cli-babel": "^5.1.3",
+    "ember-cli-node-assets": "^0.1.6"
   },
   "ember-addon": {
     "configPath": "tests/dummy/config"
