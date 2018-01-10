@@ -77,7 +77,13 @@ Rectangle.ofElement = function (element, boxModel) {
   if (boxModel) {
     size = size[boxModel];
   }
-  var offset = $(element).offset() || { top: $(element).scrollTop(), left: $(element).scrollLeft() };
+
+  var offset;
+  if (element === document || element === window) {
+    offset = { top: $(element).scrollTop(), left: $(element).scrollLeft() };
+  } else {
+    offset = $(element).offset();
+  }
 
   return new Rectangle(offset.left, offset.top, size.width, size.height);
 };
