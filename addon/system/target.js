@@ -17,6 +17,14 @@ const next = Ember.run.next;
 const isSimpleClick = Ember.ViewUtils.isSimpleClick;
 const $ = Ember.$;
 
+function includes(haystack, needle) {
+  if (haystack.includes) {
+    return haystack.includes(needle);
+  } else {
+    return haystack.contains(needle);
+  }
+}
+
 function guard (fn) {
   return function (evt) {
     if (get(this, 'component.disabled')) { return; }
@@ -226,11 +234,11 @@ var Target = Ember.Object.extend(Ember.Evented, {
     set(key, value) {
       var activators = get(this, 'on');
       if (value) {
-        if (activators.contains('focus')) {
+        if (includes(activators, 'focus')) {
           set(this, 'focused', true);
-        } else if (activators.contains('hover')) {
+        } else if (includes(activators, 'hover')) {
           set(this, 'hovered', true);
-        } else if (activators.contains('click')) {
+        } else if (includes(activators, 'click')) {
           set(this, 'pressed', true);
         }
       } else {
@@ -245,21 +253,21 @@ var Target = Ember.Object.extend(Ember.Evented, {
       var activators = get(this, 'on');
       var active = false;
 
-      if (activators.contains('focus')) {
+      if (includes(activators, 'focus')) {
         active = active || get(this, 'focused');
-        if (activators.contains('hold')) {
+        if (includes(activators, 'hold')) {
           active = active || get(this, 'component.pressed');
         }
       }
 
-      if (activators.contains('hover')) {
+      if (includes(activators, 'hover')) {
         active = active || get(this, 'hovered');
-        if (activators.contains('hold')) {
+        if (includes(activators, 'hold')) {
           active = active || get(this, 'component.hovered');
         }
       }
 
-      if (activators.contains('click') || activators.contains('hold')) {
+      if (includes(activators, 'click') || includes(activators, 'hold')) {
         active = active || get(this, 'pressed');
       }
 
@@ -332,7 +340,7 @@ var Target = Ember.Object.extend(Ember.Evented, {
     if (view && view.nearestOfType(get(this, 'component').constructor)) {
       view.trigger('click');
 
-    } else if (activators.contains('click') && activators.contains('hold')) {
+    } else if (includes(activators, 'click') && includes(activators, 'hold')) {
       // If the user waits more than 400ms between mouseDown and mouseUp,
       // we can assume that they are clicking and dragging to the menu item,
       // and we should close the menu if they mouseup anywhere not inside
